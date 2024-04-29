@@ -1,0 +1,214 @@
+library(ggplot2)
+library(here)
+library(car)
+library(DataExplorer)
+library(tidyverse)
+## Code-------------------------------------------------------------------
+# 数据导入+清洗
+data <-read.csv("/Users/ruijuanzhong/individual_data.csv") # 自己导入数据 可以删掉here包
+data$ssexmarr <- data$ssexmarr - 1 #因变量1,2 转变为0,1
+
+
+
+
+## 1.3 变量类型转换 ------------------------------------------------------
+
+
+
+# 连续变量
+
+var_num <- c('househld', 'rage',  'livearea','persinc2', 'glvis')
+
+
+var_fct <- setdiff(colnames(data), var_num)
+data[, var_fct] <- lapply(data[, var_fct], factor)
+
+
+
+## 1.2 EDA ---------------------------------------------------------------
+
+# 缺失情况
+missing_percentage <- colMeans(is.na(data)) * 100
+print(missing_percentage)
+
+# 缺失情况
+plot_missing(data)
+# boxplot
+data |> mutate(ssexmarr=as.factor(ssexmarr)) |> plot_boxplot(by = "ssexmarr")
+data |> mutate(ssexmarr=as.factor(ssexmarr)) |> plot_bar(by = "ssexmarr")
+# barplot
+plot_bar(data)
+
+
+
+
+# 合并level:其他变量自行合并
+data$rmarstat <- factor(ifelse(data$rmarstat == 1, 1,
+                               ifelse(data$rmarstat %in% c(2, 3), 2, 3)))
+
+data$highqual <- factor(ifelse(data$highqual %in% c(1, 2), 1,
+                               ifelse(data$highqual %in% c(3, 4, 5), 2,
+                                      ifelse(data$highqual %in% c(6, 7, 9), 3, NA))))
+data$uprejgay <- ifelse(data$uprejgay == 4, NA, data$uprejgay)
+data[, var_fct] <- lapply(data[, var_fct], factor)
+
+
+
+data |> select(rmarstat) |> unique()
+# 合并分类level
+data1 <- 
+  data |> 
+  mutate(
+    # 合并分类为单身，结婚，其他
+    rmarstat = case_when(
+      rmarstat == 1 ~ 'level one',
+      rmarstat %in% c(2,3) ~ 'level two',
+      rmarstat %in% c(4,5,6) ~ 'level three',
+      .default = 'level three'
+    ),
+    
+    highqual = case_when(
+      highqual %in% c(1,2) ~ 'good',
+      highqual %in% c(3,4,5) ~ 'medium',
+      highqual %in% c(6,7,9) ~ 'low',
+      
+    ),
+    
+    tea = case_when(
+      tea %in% c(1,2,3,4,5) ~ 'complete degree',
+      tea %in% c(6,7) ~ 'not yet',
+      .default = 'other',
+      
+    ),
+    rsect = case_when(
+      rsect %in% c(3,4) ~ 'yes and other',
+      .default = 'no answer',
+    ),
+    ansseca = case_when(
+      ansseca %in% c(1,2) ~ 'high level',
+      ansseca %in% c(3,4) ~ 'middle level',
+      ansseca %in% c(5,6,7,8) ~ 'low level',
+      .default = 'almost no job',
+    ),
+    chattnd2 = case_when(
+      chattnd2 %in% c(1,2) ~ 'high attendance',
+      chattnd2 %in% c(3,4,5) ~ 'moderate attendance',
+      .default = 'low and no attendance',
+      
+    ),
+    polpart2 = case_when(
+      polpart2 %in% c(1,3) ~ 'unionist paries',
+      polpart2 %in% c(2,4) ~ 'nationalist parties',
+      polpart2 %in% c(5,6,7) ~ 'other paries',
+      polpart2 %in% c(-999,-99) ~ 'none and unknown',
+    ),
+    
+    ruhappy = case_when(
+      ruhappy %in% c(1,2) ~ 'happy',
+      ruhappy %in% c(3,4) ~ 'unhappy',
+      ruhappy %in% c(8,-999) ~ 'unknown',
+      
+    ),
+    
+    healthyr = case_when(
+      healthyr %in% c(1,2) ~ 'good',
+      healthyr %in% c(4,5) ~ 'poor',
+      healthyr == 3 ~ 'fair',
+      .default = 'unknown',
+      
+    ),
+    glchild = case_when(
+      glchild %in% c(1,2) ~ 'comfortable',
+      glchild %in% c(4,5) ~ 'uncomfortable',
+      glchild %in% c(-999,-99) ~ 'not answered or applicable',
+      glchild == 3 ~ 'neither',
+    ),
+    #gexpress = case_when(
+    #gexpress %in% c(1,2) ~ 'agree',
+    #gexpress %in% c(4,5) ~ 'disagree',
+    #gexpress == 3 ~ 'neither',
+    #gexpress == 999 ~ 'not answered',
+    #),
+    # # 合并最高学历
+    # highqual = case_when(
+    #   highqual %in% c(1,2) ~ 1,
+    #   highqual %in% c(3,4,5) ~ 2,
+    #   highqual %in% c(6,7,9) ~ 3,
+    # ),
+    # # uprejgay 其他太少,赋值为NA
+    # uprejgay = ifelse(uprejgay == 4, NA, uprejgay),
+    
+    # 分类变量因子化
+    # across(all_of(var_fct), as.factor),
+  ) 
+
+
+data |> mutate(ssexmarr=as.factor(ssexmarr)) |> 
+  plot_boxplot(by = "ssexmarr")
+# barplot
+plot_bar()
+data1 |> mutate(ssexmarr=as.factor(ssexmarr)) |> plot_bar(by = "ssexmarr")
+
+
+
+## 1.4 模型分析 -----------------------------------------------------------
+
+# model1
+# glm分析
+# 删除缺失值
+data2 <- na.omit(data1)
+mod1 <- glm(ssexmarr ~ ., data = data2, family = binomial) #全部变量进行logistic regression
+summary(mod1)
+
+# 共线性检验
+car::vif(mod1)  # GVIF>5表明存在共线性
+aliased <- alias(mod1)
+print(aliased)
+
+# model2
+# 采用向后剔除法对模型变量进行筛选
+mod2 <-  step(mod1,direction = 'backward') 
+a=summary(mod2)
+car::vif(mod2) #VIF均小于5
+coef(mod2)
+#删掉ansseca变量
+data3 <- data2[,-which(names(data2) %in% c('ansseca'))]
+# 模型比较
+anova(mod1, mod2, test = "Chisq") # p=0.5423,表明mod1 和 mod2模型有差异,但是mod2变量更少,表明model2更佳
+
+# 混淆矩阵
+predictions <- ifelse(predict(mod2, data = data1, type = "response") > 0.5, 1, 0)
+table(data1$ssexmarr,predictions)
+
+#准确率86.1%
+(207+78)/(207+17+29+78)
+
+# model3
+# 用NA level替代缺失大于10%的变量的缺失值
+var_missing <- c('glborn','knowtg','work','rsuper','rsect','persinc2','polpart2') # 缺失大于10%的变量
+data2 <- data
+data2[, var_missing] <- lapply(data2[, var_missing], as.character)
+data2[, var_missing] <- lapply(data2[, var_missing], function(x) ifelse(is.na(x), "NA", x))
+data2 <- na.omit(data2)
+
+mod1na <- glm(ssexmarr ~ ., data = data2, family = binomial)
+model3 <-  step(mod1na,direction = 'backward') 
+summary(model3)
+car::vif(model3) #VIF均小于5
+
+# 模型比较
+AIC(mod2, model3) # 自己根据结果说一下缺失值填补后model3和mod2模型变量的差异,mod2 AIC更小,模型更好
+
+#混淆矩阵
+predictions2 <- ifelse(predict(model3, data = data2, type = "response") > 0.5, 1, 0)
+table(data2$ssexmarr,predictions2)
+#准确率 77.9%
+(187+366)/710
+
+
+
+# interaction
+glm(formula = ssexmarr ~ rsex + rmarstat + eqnow3 + eqnow7 + 
+      eqnow8 + rsect + carehome + anyhcond + ruhappy + uprejgay + 
+      glsocdist + knowgl + knowtg + rsex:carehome, family = binomial, data = data1) |> summary()
+(187+366)/710

@@ -1,0 +1,215 @@
+#0.Prepare ----
+library(dplyr)
+rm(list = ls())
+setwd("/Users/ruijuanzhong/Project/lol.pro/")
+file_source <- list.files('./R_16')
+for (i in 1:length(file_source)) {
+  file_source[i] <- paste('./R_16/',file_source[i],sep ="")}
+sapply(file_source,source)
+
+library(parallel)
+no_cores = detectCores() - 3
+
+require(MASS)
+# classifier.name <- "rf"
+# classifier.alg <- randomForest::randomForest
+# classifier.return = NaN
+# classifier.name <- "rf"
+# classifier.alg <- class::knn
+# classifier.return = "class"
+classifier.name <- 'lda'
+classifier.alg <- MASS::lda
+classifier.return <- "class"
+# classifier.name <- 'qda'
+# classifier.alg=MASS::qda
+# classifier.return = "class"
+# classifier.name <- "SVM"
+# classifier.alg <- e1071::svm
+# classifier.return = NaN
+# sim_idx <- 3
+
+
+# 1.Pars setting. ----
+n=100
+niter <- 1  # number of iterations per simulation
+rlen <- 40
+
+#d_vec <- rep(100,2)
+d_vec <- c(100)
+# d_vec <- c(100, 100, 100,100,100,100)
+#rmax_vec <- rep(50,6)
+rmax_vec <- c(50)
+exp_name <- paste('n',n,'_d',d_vec[1],'_iter',niter,'_', classifier.name,'_',sep = "")
+cat(exp_name)
+
+# the simulations list. 
+# sims <- list(lol.sims.cross, lol.sims.rev_rtrunk, lol.sims.rtrunk,
+#              lol.sims.myTrunck,lol.sims.myTrunck,lol.sims.myTrunck)
+# sims.name = c("Cross", "Robust","Trunk-3",'3-diag.diff','3-Random','3-Total.Random')
+# sims.opts <- list( list(rotate=TRUE), list(robust=0.4),list(K=3),
+#                    list(K=3, mean_diff=TRUE, sigma_type = 'diag.diff'),
+#                    list(K=3, mean_diff=TRUE, sigma_type = 'random'),
+#                    list(K=3, mean_diff=TRUE, sigma_type = 'total_random'))
+
+sims <- list(lol.sims.toep)
+sims.name = c("Toep")
+sims.opts <- list(list())
+
+# We can call themselves.
+# sims <- sims[sim_idx] 
+# sims.name <- sims.name[sim_idx]
+# sims.opts <- sims.opts[[sim_idx]]
+
+algs <- list(lol.project.pca, lol.project.lrlda, lol.project.pls,
+             lol.project.lol, lol.project.lol)
+algs.name <- c("PCA", "LRLDA", "PLS", "LOL", 'pca+pls')
+names(algs) <-algs.name
+algs.opts=list(list(), list(), list(),
+               list(), list(method='pca+pls'))
+
+names(algs.opts) <- algs.name
+
+simulator <- function(n,d_vec,rmax_vec,sims,sims.name,sims.opts,niter) {
+  dt_sims <- list()
+  idx <- 1
+  for (i in 1:length(sims)) {
+    for (j in 1:niter) {
+      dt_sims[[idx]] <- list(sim_func=sims[[i]], opts=c(list(n, d_vec[i]), sims.opts[[i]]),
+                             rmax=rmax_vec[i],sim=sims.name[i], iter=j)
+      idx <- idx+1
+    }
+  }
+  return(dt_sims)
+}
+
+simulations <- simulator(n=n,d_vec=d_vec,rmax_vec=rmax_vec, sims=sims,
+                         sims.name=sims.name, sims.opts=sims.opts,niter = niter)
+length(simulations)
+
+#2.Run classifier. ----
+time.before=Sys.time()
+run_sim <- function(sim,rlen,algs,algs.opts,classifier.name) {
+  sim_dat <- do.call(sim$sim_func, sim$opts)
+  X <- sim_dat$X; Y <- sim_dat$Y
+  
+  log.seq <- function(from=1, to=30, length=rlen) {
+    round(exp(seq(from=log(from), to=log(to), length.out=length)))}
+  r_vec <- unique(round(log.seq(from=1, to=sim$rmax, length=rlen)))
+  
+  results <- data.frame(sim=c(), iter=c(), alg=c(), r=c(), lhat=c())
+  for (i in 1:length(algs)) {
+    if (classifier.name == "lda") {
+      classifier.return = "class"
+      classifier.alg = MASS::lda }
+    if (sim$sim == "Cross") {
+      # for cross simulation, use QDA
+      classifier.alg=MASS::qda
+      classifier.return = "class" }
+    if (names(algs)[i] == "CCA") {
+      # CCA produces turrible embeddings that dont work w LDA as they are singular
+      classifier.alg = lol.classify.nearestCentroid
+      classifier.return = NaN}
+    tryCatch({
+      xv_res <- lol.xval.optimal_dimselect(X, Y, r_vec, algs[[names(algs)[i]]],
+                                           alg.opts=algs.opts[[names(algs)[i]]],
+                                           alg.return="A",
+                                           classifier=classifier.alg,
+                                           classifier.return=classifier.return,
+                                           k=10)
+      results <- rbind(results, data.frame(sim=sim$sim, iter=sim$iter,
+                                           fold=xv_res$folds.data$fold,
+                                           alg=names(algs)[i],
+                                           r=xv_res$folds.data$r, 
+                                           lhat=xv_res$folds.data$lhat))
+    }, error=function(e){lhat <- NaN})
+    
+  }
+  return(results)
+}
+
+# result1 <- run_sim(sim=simulations[[1]],rlen = rlen,
+#                    algs = algs,algs.opts = algs.opts,classifier.name = classifier.name)
+# result_all <- lapply(  simulations, function(sim){
+# run_sim(sim,rlen = rlen,algs = algs,algs.opts = algs.opts,classifier.name = classifier.name)
+# })
+
+result_all <- mclapply(simulations, function(sim){
+  
+  run_sim(sim,rlen = rlen,algs = algs,algs.opts = algs.opts,classifier.name = classifier.name)
+}, mc.cores=1)
+time.after=Sys.time()
+results <- do.call(rbind,result_all)
+
+# nan
+results[which(rowSums(is.na(results))==TRUE),]
+
+## save results as table
+#write.csv(results,'lrlda+pls002.csv')
+
+#3.Plot result. ----
+library(tidyverse)
+head(results)
+dt_plot <- results %>% 
+  group_by(sim,alg,r) %>% 
+  summarise(lhat=mean(lhat)) %>% 
+  mutate(best.lhat=min(lhat),
+         best.r=list(r[lhat == best.lhat]),
+         lhat.thresh=best.lhat*1.05,
+         lhat.beats=lhat <= best.lhat,
+         r.star=min(r[lhat.beats])) %>%
+  # mutate(alg=factor(recode_factor(alg, "QOL"="QOQ", "LRLDA"="rrLDA"), 
+  #                   levels=algs.name,
+  #                   ordered=TRUE)) %>%
+  #filter(!((alg %in% c("RLOL")) & (sim == "Cross"))) %>%
+  # filter(!(alg %in% c("MVI"))) %>%
+  #filter(!((alg %in% c("QOQ")) & (sim %in% c("Trunk-3", "Robust")))) %>%
+  mutate(
+    # sim=recode_factor(sim, "Trunk-3"="(A) Trunk-3", "Robust"="(B) Robust", "Cross"="(C) Cross",
+    # "class.diff-3"="(D) class.diff-3"),
+    # sim=factor(sim, levels=c("(A) Trunk-3", "(B) Robust", "(C) Cross","(D) class.diff"), ordered=TRUE))
+    # sim=factor(sim, levels=c("Trunk-3", "Robust", "Cross","class.diff-3"), ordered=TRUE))
+    sim=factor(sim, levels=sims.name, ordered=TRUE))
+head(dt_plot)
+# nan.idx<- which(rowSums(is.na(dt_plot))==TRUE)
+
+
+unique(dt_plot$alg)
+color_lib <- c("PCA"="#E69F00","LOL"="#2A91A2", "PLS"="#FF8D7D",
+               "LRLDA"= "gray50", 'pca+pls'='#CC79A7')
+
+
+line_lib <- c("PCA"="solid", "LOL"="solid", "PLS"="dashed",
+              "LRLDA"="dashed", 'pca+pls'='solid')
+
+dt.star <- dt_plot %>% filter(r == r.star)
+dt_plot %>%
+  # slice(nan.idx) %>% 
+  ggplot(aes(x=r, y=lhat, color=alg)) +
+  geom_line(aes(linetype=alg), size=0.7) +
+  scale_linetype_manual(values=line_lib, name="Algorithm") +
+  scale_color_manual(values=color_lib, name="Algorithm") +
+  geom_point(data=dt.star, size=3, shape=16) +
+  # facet_grid(.~sim) +
+  facet_wrap(.~sim,scales = 'free',nrow = 2) +
+  xlab("r") +
+  ylab("error") +
+  guides(color=guide_legend(ncol=1), linetype=guide_legend(ncol=1)) +
+  labs(
+    title = paste('Classifier:',classifier.name,', n=',n,', d=',d_vec[1],', rep=',niter,sep = "")  ) +
+  theme(text=element_text(size=18))
+# strip.text.x=element_blank(),
+# strip.background=element_blank()) 
+
+#4.Aggregate and save ----
+#=================================#
+# unique(resultso$alg)
+# simn <- 3
+out_path <- './sim/output/'
+out_time <- format(Sys.time(), "%Y.%m.%d-%H:%M")
+l# w_a4 <- 297
+# h_a4 <- 210
+w_a4 <- 400
+h_a4 <- 200
+ggsave(paste(exp_name,out_time,'.jpg',sep = ""),path = out_path,
+       width = w_a4, height = h_a4,units = 'mm', device='jpg', dpi=720)
+saveRDS(results, file.path(out_path,paste(exp_name,out_time,'.rds', sep="")))
