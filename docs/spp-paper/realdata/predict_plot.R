@@ -7,9 +7,9 @@ library(datamicroarray)
 library(dplyr)
 library(smotefamily)
 
-file_source <- list.files('/Users/ruijuanzhong/spp/docs/lolR')
+file_source <- list.files('/Users/ruijuanzhong/spp')
 for (i in 1:length(file_source)) {
-  file_source[i] <- paste('/Users/ruijuanzhong/spp/docs/lolR/',file_source[i],sep ="")}
+  file_source[i] <- paste('/Users/ruijuanzhong/spp/',file_source[i],sep ="")}
 sapply(file_source,source)
 
 no_cores = detectCores()
