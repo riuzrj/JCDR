@@ -293,7 +293,7 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
     }
 
     # compute the top r embedding dimensions
-    max.r <- max(rs)+30
+    max.r <- max(rs)+20
 
     # hyperparameters are the number of embedding dimensions and other options requested.
     dim.embed <- list()
@@ -333,6 +333,21 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
           A <- mod[[alg.embedding]]}
       }
 
+      r = 1:(K-1)
+      Lhat.K = lapply(1:(K-1), function(r) {
+        A.pq = A[ , r]
+        X_proj <- lol.embed(X[set$train,,drop=FALSE], A.pq)
+        X.test.proj <- lol.embed(X[set$test,,drop=FALSE], A.pq)
+        trained_classifier <- do.call(classifier,
+                                      c(list(X_proj, as.factor(Y[set$train,drop=FALSE])),classifier.opts))
+        if (is.nan(classifier.return)) {
+          Yhat <- predict(trained_classifier, X.test.proj)}
+        else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
+        return(data.frame(lhat = 1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), grid_1 = 0, grid_2 = 0, r=r, fold=i, Yhat = Yhat,
+                          Y = Y[set$test,drop=FALSE]))
+      })
+      Lhat.K <- do.call(rbind, Lhat.K)
+      
       Lhat.data = apply(grid, 1, function(x){
         #print('grid')
         tryCatch({
@@ -380,25 +395,26 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
       #skip nulls
       Lhat.data <- Lhat.data[!sapply(Lhat.data, is.null)]
       Lhat.data = do.call(rbind, Lhat.data)
-      return(Lhat.data)
+      cv = rbind(Lhat.K, Lhat.data)
+      return(cv)
     })
 
     results <- do.call(rbind, cv)
     #print(results[1,])
-    results.means = aggregate(results$lhat, by = list(results$grid_1,results$grid_2), FUN = mean)
+    results.means = aggregate(results$lhat, by = list(results$grid_1,results$grid_2, results$r), FUN = mean)
     #print(results.means[1,])
-    results.means$r = results.means$Group.1 + results.means$Group.2 + K - 1
-    names(results.means)[1:3] <- c("Group.1", "Group.2", "lhat")
+    #results.means$r = results.means$Group.1 + results.means$Group.2 + K - 1
+    names(results.means)[1:4] <- c("Group.1", "Group.2", "r", "lhat")
 
     results_df <- results.means %>%
       group_by(r) %>%
       filter(lhat == min(lhat)) %>%
       ungroup() %>%
-      dplyr::select(Group.1, Group.2) %>%
+      dplyr::select(Group.1, Group.2, r) %>%
       distinct()
 
     results <- results %>%
-      semi_join(results_df, by = c("grid_1" = "Group.1", "grid_2" = "Group.2"))
+      semi_join(results_df, by = c("grid_1" = "Group.1", "grid_2" = "Group.2", "r" = "r"))
 
     #print(results[1,])
 
