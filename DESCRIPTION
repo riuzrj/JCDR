@@ -5,7 +5,7 @@ Version: 0.1.0
 Author: Ruijuan zhong
 Maintainer: Ruijuan zhong <zrj181329@gmail.com>
 Description: A supervised dimension reduction method that combines PCA and PLS for high dimensional classification data.
-License: WGPL-2
+License: GPL-2
 Imports:
     lolR,
     MASS,
