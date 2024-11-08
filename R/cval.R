@@ -62,7 +62,7 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
                                        alg.structured=TRUE, classifier=lda, classifier.opts=list(),
                                        classifier.return="class", k='loo', rank.low=FALSE, ...) {
   if (length(alg.opts) == 0){
-
+    #print('lol')
     #write.table(X, "output.txt", append = TRUE, col.names = FALSE, row.names = FALSE)
     d <- dim(X)[2]
     Y <- factor(Y)
@@ -71,28 +71,28 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
     if (n != x.n) {
       stop(sprintf("Your X has %d examples, but you only provide %d labels.", x.n, n))
     }
-    # check that if the user specifies the cross-validation set, if so, that it is correctly set up
+    # check that if the user specifies the cross-validation set, if so, that it is correctly set up 
     # otherwise, do it for them
     if (is.null(sets)) {
       sets <- lol.xval.split(X, Y, k=k, rank.low=rank.low)
     } else {
       lol.xval.check_xv_set(sets, n)
     }
-
+    
     # compute the top r embedding dimensions
     max.r <- max(rs)
-
+    
     # hyperparameters are the number of embedding dimensions and other options requested.
     dim.embed <- list()
     dim.embed[[alg.dimname]] <- max.r
     alg.hparams <- c(dim.embed, alg.opts)
-
-
+    
+    
     Lhat.data <- lapply(1:length(sets), function(i) {
       set <- sets[[i]]
       # if the algorithm is appropriately structured, we can avoid computing on every iteration and
       # just compute on the maximum number of embedding dimensions
-
+      
       if (alg.structured) {
         # learn the projection with the algorithm specified
         mod <- do.call(alg, c(list(X=X[set$train,,drop=FALSE], Y=as.factor(Y[set$train,drop=FALSE])), alg.hparams))
@@ -102,8 +102,8 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
         } else {
           A <- mod[[alg.embedding]]}
       }
-
-
+      
+      
       # check fold with every desired possibility of embedding dimensions
       res.rs <- lapply(rs, function(r){
         tryCatch({
@@ -122,16 +122,34 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
           X.test.proj <- lol.embed(X[set$test,,drop=FALSE], A.r)
           # project the data with the projection just learned
           # compute the trained classifier
-          trained_classifier <- do.call(classifier,
-                                        c(list(lol.embed(X[set$train,,drop=FALSE], A.r),
-                                               as.factor(Y[set$train,drop=FALSE])),classifier.opts))
-
-          # and compute the held-out error for particular fold
-          if (is.nan(classifier.return)) {
-            Yhat <- predict(trained_classifier, X.test.proj)}
-          else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
-
-          return(data.frame(lhat=1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), r=r, fold=i, Yhat))},
+          if (classifier.name == 'lda' || classifier.name == 'svm'){
+            trained_classifier <- do.call(classifier,
+                                          c(list(lol.embed(X[set$train,,drop=FALSE], A.r),
+                                                 as.factor(Y[set$train,drop=FALSE])),classifier.opts))
+            # and compute the held-out error for particular fold
+            if (is.nan(classifier.return)) {
+              Yhat <- predict(trained_classifier, X.test.proj)}
+            else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
+          } else if (classifier.name == 'adaboost'){
+            trainData_X <- data.frame(lol.embed(X[set$train,,drop=FALSE], A.r))
+            colnames(trainData_X) <- paste0("X", 1:ncol(trainData_X))
+            trainData_combined <- data.frame(trainData_X, 
+                                             Class = as.factor(Y[set$train,drop=FALSE]))
+            #print(str(trainData_combined))
+            trained_classifier <- classifier(Class~., trainData_combined)
+            testData <- data.frame(X.test.proj)
+            colnames(testData) <- paste0("X", 1:ncol(testData))
+            Yhat <- adabag::predict.boosting(trained_classifier, testData)[[classifier.return]]
+          } else if (classifier.name == 'knn'){
+              Yhat <- knn(lol.embed(X[set$train,,drop=FALSE], A.r), X.test.proj, Y[set$train,drop=FALSE], k=3)
+            }
+          # class = 'READ'
+          # Indices = which(Y[set$test] == class)
+          # Yhat_class = Yhat[Indices]
+          # Y_true_class = Y[set$test][Indices]
+          # return(data.frame(lhat=1 - sum(Yhat_class == Y_true_class)/length(Yhat_class), r=r, fold=i))
+          return(data.frame(lhat=1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), r=r, fold=i))
+          },
           error=function(e){print(e); return(NULL)})
       })
       # skip nulls
@@ -140,32 +158,46 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
       return(res.rs)
     })
     results <- do.call(rbind, Lhat.data)
-
+    #print(results[1,])
     # compute fold-wise average
     results.means <- aggregate(lhat ~ r, data = results, FUN = nan.mean)
-
+    #print(results.means[1,])
     # find the number of embedding dimensions with lowest average error
     optimal.idx <- which(results.means$lhat == min(results.means$lhat))
     best.r <- min(results.means$r[optimal.idx])  # best is the minimum of the possible choices
+    #print(best.r)
     # recompute on all data with the best number of embedding dimensions
     alg.hparams[[alg.dimname]] <- best.r
     model <- do.call(alg, c(list(X=X, Y=Y), alg.hparams))
-
+    
     if (is.nan(alg.embedding)) {
       A <- model}
     else {
       A <- model[[alg.embedding]]}
-
-    # and train the classifier for good measure
-    class <- do.call(classifier, c(list(lol.embed(X, A), Y), classifier.opts))
+    
+    if(classifier.name =='lda' || classifier.name == 'svm'){
+      # train the classifier for good measure
+      class <- do.call(classifier, c(list(lol.embed(X, A), Y), classifier.opts))
+    } else if (classifier.name == 'adaboost'){
+      Data_combined <- data.frame(lol.embed(X, A), Class = as.factor(Y))
+      class <- classifier(Class~., Data_combined)
+    }
+    
+    # return(list(folds.data=results,
+    #             foldmeans.data=results.means,
+    #             optimal.lhat=results.means$lhat[optimal.idx],
+    #             optimal.r=best.r,
+    #             model=model, classifier=class))
     return(list(folds.data=results,
                 foldmeans.data=results.means,
                 optimal.lhat=results.means$lhat[optimal.idx],
                 optimal.r=best.r,
-                model=model, classifier=class))
+                model=model))
   }
-   if (alg.opts == 'mvi'|| alg.opts == 'xi'){
-
+  
+  
+  if (alg.opts == 'quadratic'|| alg.opts == 'mvi'|| alg.opts == 'xi'){
+    
     # print("MVI")
     d <- dim(X)[2]
     Y <- factor(Y)
@@ -174,29 +206,28 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
     if (n != x.n) {
       stop(sprintf("Your X has %d examples, but you only provide %d labels.", x.n, n))
     }
-    # check that if the user specifies the cross-validation set, if so, that it is correctly set up
+    # check that if the user specifies the cross-validation set, if so, that it is correctly set up 
     # otherwise, do it for them
     if (is.null(sets)) {
-      sets <- lolR::lol.xval.split(X, Y, k=k, rank.low=rank.low)
+      sets <- lol.xval.split(X, Y, k=k, rank.low=rank.low)
     } else {
-      lolR::lol.xval.check_xv_set(sets, n)
+      lol.xval.check_xv_set(sets, n)
     }
-
+    
     # compute the top r embedding dimensions
     max.r <- max(rs)
-
+    
     # hyperparameters are the number of embedding dimensions and other options requested.
     dim.embed <- list()
     dim.embed[[alg.dimname]] <- max.r
     alg.hparams <- c(dim.embed, alg.opts)
-
-
+    
+    
     Lhat.data <- lapply(1:length(sets), function(i) {
-      #print(i)
       set <- sets[[i]]
       # if the algorithm is appropriately structured, we can avoid computing on every iteration and
       # just compute on the maximum number of embedding dimensions
-
+      
       if (alg.structured) {
         # learn the projection with the algorithm specified
         mod <- do.call(alg, c(list(X=X[set$train,,drop=FALSE], Y=as.factor(Y[set$train,drop=FALSE])), alg.hparams))
@@ -206,7 +237,7 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
         } else {
           A <- mod[[alg.embedding]]}
       }
-
+      
       # check fold with every desired possibility of embedding dimensions
       res.rs <- lapply(rs, function(r){
         tryCatch({
@@ -225,54 +256,75 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
           X.test.proj <- lol.embed(X[set$test,,drop=FALSE], A.r)
           # project the data with the projection just learned
           # compute the trained classifier
-          trained_classifier <- do.call(classifier,
-                                        c(list(lol.embed(X[set$train,,drop=FALSE], A.r),
-                                               as.factor(Y[set$train,drop=FALSE])),classifier.opts))
-          #print('5')
-          # and compute the held-out error for particular fold
-          if (is.nan(classifier.return)) {
-            Yhat <- predict(trained_classifier, X.test.proj)}
-          else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
-          return(data.frame(lhat=1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), r=r, fold=i))},
+          if (classifier.name == 'lda' || classifier.name == 'svm'){
+            trained_classifier <- do.call(classifier,
+                                          c(list(lol.embed(X[set$train,,drop=FALSE], A.r),
+                                                 as.factor(Y[set$train,drop=FALSE])),classifier.opts))
+            # and compute the held-out error for particular fold
+            if (is.nan(classifier.return)) {
+              Yhat <- predict(trained_classifier, X.test.proj)}
+            else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
+          } else if (classifier.name == 'adaboost'){
+            trainData_X <- data.frame(lol.embed(X[set$train,,drop=FALSE], A.r))
+            colnames(trainData_X) <- paste0("X", 1:ncol(trainData_X))
+            trainData_combined <- data.frame(trainData_X, 
+                                             Class = as.factor(Y[set$train,drop=FALSE]))
+            trained_classifier <- classifier(Class~., trainData_combined)
+            testData <- data.frame(X.test.proj)
+            colnames(testData) <- paste0("X", 1:ncol(testData))
+            Yhat <- adabag::predict.boosting(trained_classifier, testData)[[classifier.return]]
+          } else if (classifier.name == 'knn'){
+            Yhat <- knn(lol.embed(X[set$train,,drop=FALSE], A.r), X.test.proj, Y[set$train,drop=FALSE], k=3)
+          }
+          # class = 'READ'
+          # Indices = which(Y[set$test] == class)
+          # Yhat_class = Yhat[Indices]
+          # Y_true_class = Y[set$test][Indices]
+          # return(data.frame(lhat=1 - sum(Yhat_class == Y_true_class)/length(Yhat_class), r=r, fold=i))
+          return(data.frame(lhat=1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), r=r, fold=i))
+          },
           error=function(e){print(e); return(NULL)})
       })
       # skip nulls
       res.rs <- res.rs[!sapply(res.rs, is.null)]
       res.rs = do.call(rbind, res.rs)
-      #print('6')
       return(res.rs)
     })
     results <- do.call(rbind, Lhat.data)
-
+    
     # compute fold-wise average
-    results.means <- aggregate(lhat ~ r, data = results, FUN = nan.mean)
-
+    results.means <- aggregate(lhat ~ r, data = results, FUN = nan.mean) 
+    
     # find the number of embedding dimensions with lowest average error
     optimal.idx <- which(results.means$lhat == min(results.means$lhat))
     best.r <- min(results.means$r[optimal.idx])  # best is the minimum of the possible choices
     # recompute on all data with the best number of embedding dimensions
     alg.hparams[[alg.dimname]] <- best.r
     model <- do.call(alg, c(list(X=X, Y=Y), alg.hparams))
-
+    
     if (is.nan(alg.embedding)) {
       A <- model}
     else {
       A <- model[[alg.embedding]]}
-
-    # and train the classifier for good measure
-    class <- do.call(classifier, c(list(lol.embed(X, A), Y), classifier.opts))
-    #print('MVI2')
+    
+    if(classifier.name =='lda' || classifier.name == 'svm'){
+      # train the classifier for good measure
+      class <- do.call(classifier, c(list(lol.embed(X, A), Y), classifier.opts))
+    } else if (classifier.name == 'adaboost'){
+      Data_combined <- data.frame(lol.embed(X, A), Class = as.factor(Y))
+      class <- classifier(Class~., Data_combined)
+    }
     return(list(folds.data=results,
                 foldmeans.data=results.means,
                 optimal.lhat=results.means$lhat[optimal.idx],
                 optimal.r=best.r,
                 model=model, classifier=class))
   }
-
-
+  
+  
   ## pca+pls part
   if (alg.opts=='pca+pls'){
-
+    
     #print('pca+pls')
     info <- lol.utils.info(X, Y, robust=FALSE)
     #print('pca+pls')
@@ -284,45 +336,47 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
     if (n != x.n) {
       stop(sprintf("Your X has %d examples, but you only provide %d labels.", x.n, n))
     }
-    # check that if the user specifies the cross-validation set, if so, that it is correctly set up
+    # check that if the user specifies the cross-validation set, if so, that it is correctly set up 
     # otherwise, do it for them
     if (is.null(sets)) {
       sets <- lol.xval.split(X, Y, k=k, rank.low=rank.low)
     } else {
       lol.xval.check_xv_set(sets, n)
     }
-
+    
     # compute the top r embedding dimensions
-    max.r <- max(rs)+20
-
+    max.r <- max(rs) + 20
+    
     # hyperparameters are the number of embedding dimensions and other options requested.
     dim.embed <- list()
     dim.embed[[alg.dimname]] <- max.r
     alg.hparams <- c(dim.embed, alg.opts)
-
+    
     # tuning two parameters p and q
     # p = seq(0, 24, by = 1)
     # q = seq(0, 20, by = 1)
-
+    
     # for real data
     # p = seq(0, 35, by = 1)
     # q = seq(0, 35, by = 1)
-
-    p = seq(1, 30, by = 1)
-    q = seq(0, 20, by = 1)
+    
+    
+    p = seq(0, 10, by = 1)
+    q = seq(0, 15, by = 1)
+    
     # generate grid
     grid = expand.grid(x = p, y = q)
-
+    
     # calculate the error rate at each grid
-
-
+    
+    
     # cross valisation
     cv = lapply(1:length(sets), function(i) {
       #print(i)
       set <- sets[[i]]
       # if the algorithm is appropriately structured, we can avoid computing on every iteration and
       # just compute on the maximum number of embedding dimensions
-
+      
       if (alg.structured) {
         # learn the projection with the algorithm specified
         mod <- do.call(alg, c(list(X=X[set$train,,drop=FALSE], Y=as.factor(Y[set$train,drop=FALSE])), alg.hparams))
@@ -332,92 +386,151 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
         } else {
           A <- mod[[alg.embedding]]}
       }
-
-      r = 1:(K-1)
+      #r = 1:(K-1)
       Lhat.K = lapply(1:(K-1), function(r) {
-        A.pq = A[ , r]
-        X_proj <- lol.embed(X[set$train,,drop=FALSE], A.pq)
-        X.test.proj <- lol.embed(X[set$test,,drop=FALSE], A.pq)
-        trained_classifier <- do.call(classifier,
-                                      c(list(X_proj, as.factor(Y[set$train,drop=FALSE])),classifier.opts))
-        if (is.nan(classifier.return)) {
-          Yhat <- predict(trained_classifier, X.test.proj)}
-        else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
-        return(data.frame(lhat = 1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), grid_1 = 0, grid_2 = 0, r=r, fold=i, Yhat = Yhat,
-                          Y = Y[set$test,drop=FALSE]))
+        tryCatch({
+          A.pq = A[ , 1:r]
+          X_proj <- lol.embed(X[set$train,,drop=FALSE], A.pq)
+          X.test.proj <- lol.embed(X[set$test,,drop=FALSE], A.pq)
+          if (classifier.name == 'lda' || classifier.name == 'svm'){
+            trained_classifier <- do.call(classifier,
+                                          c(list(lol.embed(X[set$train,,drop=FALSE], A.pq),
+                                                 as.factor(Y[set$train,drop=FALSE])),classifier.opts))
+            # and compute the held-out error for particular fold
+            if (is.nan(classifier.return)) {
+              Yhat <- predict(trained_classifier, X.test.proj)}
+            else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
+          } else if (classifier.name == 'adaboost'){
+            trainData_X <- data.frame(lol.embed(X[set$train,,drop=FALSE], A.pq))
+            colnames(trainData_X) <- paste0("X", 1:ncol(trainData_X))
+            trainData_combined <- data.frame(trainData_X, 
+                                             Class = as.factor(Y[set$train,drop=FALSE]))
+            trained_classifier <- classifier(Class~., trainData_combined)
+            testData <- data.frame(X.test.proj)
+            colnames(testData) <- paste0("X", 1:ncol(testData))
+            Yhat <- adabag::predict.boosting(trained_classifier, testData)[[classifier.return]]
+          } else if (classifier.name == 'rf'){
+            trainData_combined <- data.frame(lol.embed(X[set$train,,drop=FALSE], A.pq), 
+                                             Class = as.factor(Y[set$train,drop=FALSE]))
+            trained_classifier <- classifier(Class~., trainData_combined)
+            testData_combined <- data.frame(X.test.proj)
+            Yhat <- predict(trained_classifier, testData_combined)
+          } else if (classifier.name == 'knn'){
+            Yhat <- knn(lol.embed(X[set$train,,drop=FALSE], A.pq), X.test.proj, Y[set$train,drop=FALSE], k=3)
+          }
+        #   class = 'READ'
+        #   Indices = which(Y[set$test] == class)
+        #   Yhat_class = Yhat[Indices]
+        #   Y_true_class = Y[set$test][Indices]
+        #   return(data.frame(lhat = 1 - sum(Yhat_class == Y_true_class)/length(Yhat_class), grid_1=0,grid_2=0, r=r, fold=i))
+        # },
+          return(data.frame(lhat = 1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), grid_1 = 0, grid_2 = 0, r=r, fold=i))},
+          error=function(e){print(e); return(NULL)})
       })
+      
       Lhat.K <- do.call(rbind, Lhat.K)
       
-      Lhat.data = apply(grid, 1, function(x){
+      Lhat.data = apply(grid, 1, function(x){ 
         #print('grid')
         tryCatch({
           if(x[2]==0){
             A.pq = A[,1:(x[1]+K-1)]
-            #A.p = A[,1:x[1]]
           }else{
             A.p = A[,1:(x[1]+K-1)]
-            #A.p = A[,1:x[1]]
             A.q = A[,(ceiling(max.r/2)+K):(ceiling(max.r/2)+K-1+x[2])]
             A.pq = cbind(A.p, A.q)
-
-            X_proj <- lol.embed(X[set$train,,drop=FALSE], A.pq)
-
-            screen_result <- VariableScreening::screenIID(X_proj,as.factor(Y[set$train, drop=FALSE]),method = 'MV-SIS')
-            idx = screen_result$rank
-            A.pq = A.pq[,idx]
+            
+            # X_proj <- lol.embed(X[set$train,,drop=FALSE], A.pq)
+            # screen_result <- VariableScreening::screenIID(X_proj,as.factor(Y[set$train, drop=FALSE]),method = 'MV-SIS')
+            # idx = screen_result$rank
+            # A.pq = A.pq[,idx]
           }
           # embed the test points with the embedding matrix computed on the training data
           X.test.proj <- lol.embed(X[set$test,,drop=FALSE], A.pq)
+
           # project the data with the projection just learned
           # compute the trained classifier
-          trained_classifier <- do.call(classifier,
-                                        c(list(lol.embed(X[set$train,,drop=FALSE], A.pq),
-                                               as.factor(Y[set$train,drop=FALSE])),classifier.opts))
-
-          # and compute the held-out error for particular fold
-          if (is.nan(classifier.return)) {
-            Yhat <- predict(trained_classifier, X.test.proj)}
-          else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
-
-          return(data.frame(lhat=1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat),
-                            grid_1=x[1],grid_2=x[2],
-                            #r=x[1]+x[2],
-                            r=x[1]+x[2]+K-1,
-                            fold=i, Yhat=Yhat, Y=Y[set$test,drop=FALSE]))
-          # return(data.frame(lhat=1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat),
-          #                   grid_1=x[1],grid_2=x[2],
-          #                   #r=x[1]+x[2],
-          #                   r=x[1]+x[2]+K-1,
-          #                   fold=i))
+          if (classifier.name == 'lda' || classifier.name == 'svm'){
+            #print('lda')
+            trained_classifier <- do.call(classifier,
+                                          c(list(lol.embed(X[set$train,,drop=FALSE], A.pq),
+                                                 as.factor(Y[set$train,drop=FALSE])),classifier.opts))
+            # and compute the held-out error for particular fold
+            if (is.nan(classifier.return)) {
+              Yhat <- predict(trained_classifier, X.test.proj)}
+            else {Yhat <- predict(trained_classifier, X.test.proj)[[classifier.return]]}
+            #print('Yhat')
+          } else if (classifier.name == 'adaboost'){
+            trainData_X <- data.frame(lol.embed(X[set$train,,drop=FALSE], A.pq))
+            colnames(trainData_X) <- paste0("X", 1:ncol(trainData_X))
+            trainData_combined <- data.frame(trainData_X, 
+                                             Class = as.factor(Y[set$train,drop=FALSE]))
+            trained_classifier <- classifier(Class~., trainData_combined)
+            testData <- data.frame(X.test.proj)
+            colnames(testData) <- paste0("X", 1:ncol(testData))
+            Yhat <- adabag::predict.boosting(trained_classifier, testData)[[classifier.return]]
+          } else if (classifier.name == 'rf'){
+            trainData_combined <- data.frame(lol.embed(X[set$train,,drop=FALSE], A.pq), 
+                                             Class = as.factor(Y[set$train,drop=FALSE]))
+            trained_classifier <- classifier(Class~., trainData_combined)
+            testData_combined <- data.frame(X.test.proj)
+            Yhat <- predict(trained_classifier, testData_combined)
+          } else if (classifier.name == 'knn'){
+            Yhat <- knn(lol.embed(X[set$train,,drop=FALSE], A.pq), X.test.proj, Y[set$train,drop=FALSE], k=3)
+          }
+         # calculate the 'READ' class error
+          # class = 'READ'
+          # Indices = which(Y[set$test] == class)
+          # Yhat_class = Yhat[Indices]
+          # Y_true_class = Y[set$test][Indices]
+          # return(data.frame(lhat = 1 - sum(Yhat_class == Y_true_class)/length(Yhat_class), grid_1=x[1],grid_2=x[2], r=x[1]+x[2]+K-1, fold=i))
+          return(data.frame(lhat=1 - sum(Yhat == Y[set$test,drop=FALSE])/length(Yhat), grid_1=x[1],grid_2=x[2], r=x[1]+x[2]+K-1, fold=i))
         },
         error=function(e){print(e); return(NULL)})
       })
       #skip nulls
+      #print('Lhat.data')
       Lhat.data <- Lhat.data[!sapply(Lhat.data, is.null)]
       Lhat.data = do.call(rbind, Lhat.data)
       cv = rbind(Lhat.K, Lhat.data)
+      # cv.mean = mean(cv$lhat)
       return(cv)
+      
     })
-
     results <- do.call(rbind, cv)
     #print(results[1,])
+    #write.table(Y, "output.txt", append = TRUE, col.names = FALSE, row.names = FALSE)
     results.means = aggregate(results$lhat, by = list(results$grid_1,results$grid_2, results$r), FUN = mean)
-    #print(results.means[1,])
+    
     #results.means$r = results.means$Group.1 + results.means$Group.2 + K - 1
-    names(results.means)[1:4] <- c("Group.1", "Group.2", "r", "lhat")
-
+    names(results.means)[1:4] <- c("Group.1", "Group.2", 'r',"lhat")
+    
+    # results_df <- results.means %>%
+    #   group_by(r) %>%
+    #   filter(lhat == min(lhat)) %>%
+    #   ungroup() %>%
+    #   select(Group.1, Group.2) %>%
+    #   distinct()
+    
     results_df <- results.means %>%
       group_by(r) %>%
       filter(lhat == min(lhat)) %>%
       ungroup() %>%
       dplyr::select(Group.1, Group.2, r) %>%
       distinct()
-
+    
+    # filtered <- ungroup(filtered)
+    # 
+    # selected <- filtered[, c("Group.1", "Group.2")]
+    # results_df <- unique(selected)
+    
+    #print(results_df)
+    
     results <- results %>%
       semi_join(results_df, by = c("grid_1" = "Group.1", "grid_2" = "Group.2", "r" = "r"))
-
+    
     #print(results[1,])
-
+    
     #print(dim(results.means))
     min_index <- which.min(results.means$x)
     #print(min_index)
@@ -425,25 +538,30 @@ spp.xval.optimal_dimselect <- function(X, Y, rs, alg, sets=NULL, alg.dimname="r"
     min_y <- results.means$Group.2[min_index]
     #print('minxy')
     optimal.lhat <- results.means$x[min_index]
-
-    ##  best.r??
-    #print(optimal.lhat)
+    
     ### need to correct
     model <- do.call(alg, c(list(X=X, Y=Y), alg.hparams))
-
+    
     if (is.nan(alg.embedding)) {
       A <- model}
     else {
       A <- model[[alg.embedding]]}
-
-    # and train the classifier for good measure
-    class <- do.call(classifier, c(list(lol.embed(X, A), Y), classifier.opts))
-
+    
+    if(classifier.name =='lda' || classifier.name == 'svm'){
+      # train the classifier for good measure
+      class <- do.call(classifier, c(list(lol.embed(X, A), Y), classifier.opts))
+    } else if (classifier.name == 'adaboost' || classifier.name == 'rf'){
+      Data_combined <- data.frame(lol.embed(X, A), Class = as.factor(Y))
+      class <- classifier(Class~., Data_combined)
+    }
+    
+    
     return(list(folds.data=results,
                 foldmeans=results.means,
                 optimal.lhat=optimal.lhat,
                 optimal.r=paste(min_x+min_y+1),
                 model=model, classifier=class))
-  }
+    #return(rbind(res.rs))   
+  } 
 }
 
