@@ -40,7 +40,7 @@
 #' model <- spp(X, Y, r=3)
 #'
 #' # use mvi method for projection
-#' model <- spp(X, Y, r=2, method='mvi')
+#' model <- spp(X, Y, r=3, method='mvi')
 #' @export
 
 spp <- function(X, Y, r, method='pca+pls', orth.first=FALSE,
