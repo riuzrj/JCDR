@@ -37,7 +37,7 @@
 #'
 #' X <- iris[,1:4]
 #' Y <- iris[,5]
-#' model <- spp(X, Y, r=2)
+#' model <- spp(X, Y, r=3)
 #'
 #' # use mvi method for projection
 #' model <- spp(X, Y, r=2, method='mvi')
