@@ -72,7 +72,14 @@ spp.xval.optimal_dimselect(
 \item{r}{the number of embedding dimensions desired, where \code{r <= d}.}
 }
 \value{
-
+a list containing the following elements:
+\itemize{
+\item{\code{folds.data}}{the results of the per-fold accuracy of the classifier.}
+\item{\code{foldmeans}}{the mean accuracy of the classifier across all folds.}
+\item{\code{optimal.lhat}}{the optimal classifier accuracy.}
+\item{\code{optimal.r}}{the optimal embedding dimensionality.}
+\item{\code{model}}{the model object returned by the classifier at the optimal embedding dimensionality.}
+\item{\code{classifier}}{the classifier used to assess performance.}}
 }
 \description{
 A function for performing cross-validation for a given emdedding model.
@@ -80,12 +87,12 @@ This function produces fold-wise cross-validated misclassification rates.
 Users can optionally specify custom embedding techniques with proper configuration of \code{alg.*} parameters and hyperparameters.
 }
 \examples{
-library(spp)
+library(JCDR)
 library(MASS)
 library(lolR)
 data(iris)
-X <- iris[,1:4]; Y <- iris[,5]
-cval <- spp.xval.optimal_dimselect(X, Y, rs=c(1,2), spp, alg.opts=list(method='mvi'),
-                                   alg.embedding="A", classifier.opts=list(),k=10)
-
+X <- as.matrix(iris[,1:4]); Y <- iris[,5]
+classifier.name <- c('lda')
+cval <- spp.xval.optimal_dimselect(X, Y, rs=c(1,2,3,4), spp, alg.opts=list(method='mvi'),
+                                   alg.embedding="A", classifier.opts=list(),k=5)
 }

@@ -1,13 +1,13 @@
 library(GGally)
 library(datamicroarray)
 
-file_source <- list.files('/Users/ruijuanzhong/spp/R')
+file_source <- list.files('/Users/ruijuanzhong/JCDR/R')
 for (i in 1:length(file_source)) {
-  file_source[i] <- paste('/Users/ruijuanzhong/spp/R/',file_source[i],sep ="")}
+  file_source[i] <- paste('/Users/ruijuanzhong/JCDR/R/',file_source[i],sep ="")}
 sapply(file_source,source)
-file_source <- list.files('/Users/ruijuanzhong/spp/docs/lolR')
+file_source <- list.files('/Users/ruijuanzhong/JCDR/docs/lolR')
 for (i in 1:length(file_source)) {
-  file_source[i] <- paste('/Users/ruijuanzhong/spp/docs/lolR/',file_source[i],sep ="")}
+  file_source[i] <- paste('/Users/ruijuanzhong/JCDR/docs/lolR/',file_source[i],sep ="")}
 sapply(file_source,source)
 
 #data
@@ -15,8 +15,8 @@ data('burczynski', package = 'datamicroarray')
 X = as.matrix(burczynski$x)
 Y = as.factor(burczynski$y)
 # Projcetion of PCA
-pca <- lol.project.lrlda(X, Y, r = 3, xfm=FALSE, xfm.opts=list(), robust=FALSE)
-proj_data = lol.embed(X, pca$A)
+pca <- spp.project.lrlda(X, Y, r = 3, xfm=FALSE, xfm.opts=list(), robust=FALSE)
+proj_data = spp.embed(X, pca$A)
 proj_data = as.data.frame(proj_data)
 colnames(proj_data) = c('PC1', 'PC2', 'PC3')
 # Make sure your data is in a data frame with PC1, PC2, and PC3 as columns
@@ -28,7 +28,7 @@ pairs(df, main = "Scatter plot matrix with the first three principal components"
 
 
 #Projection of PLS
-pls <- lol.project.pls(X, Y, r = 3, xfm=FALSE, xfm.opts=list(), robust=FALSE)
+pls <- spp.project.pls(X, Y, r = 3, xfm=FALSE, xfm.opts=list(), robust=FALSE)
 proj_data_pls = lol.embed(X, pls$A)
 
 proj_data_pls = as.data.frame(proj_data_pls)
@@ -43,15 +43,15 @@ pairs(df_1, main = "Scatter plot matrix with the first three principal component
 
 # Projection of PCA+PLS
 robust.first <- TRUE
-info <- lol.utils.info(X, Y, robust=robust.first)
+info <- spp.utils.info(X, Y, robust=robust.first)
 priors <- info$priors; centroids <- info$centroids
-first.moment.proj <- lol.utils.deltas(centroids, priors, robust=robust.first)
+first.moment.proj <- spp.utils.deltas(centroids, priors, robust=robust.first)
 
-lrlda_1 <- lol.project.lrlda(X, Y, r = 30, xfm=FALSE, xfm.opts=list(), robust=FALSE)
-pls_1 <- lol.project.pls(X, Y, r = 30, xfm=FALSE, xfm.opts=list(), robust=FALSE)
+lrlda_1 <- spp.project.lrlda(X, Y, r = 30, xfm=FALSE, xfm.opts=list(), robust=FALSE)
+pls_1 <- spp.project.pls(X, Y, r = 30, xfm=FALSE, xfm.opts=list(), robust=FALSE)
 pca_pls <- cbind(lrlda_1$A[, 1:2], pls_1$A[, 3:4])
 pca_pls <- cbind(first.moment.proj, pca_pls)
-proj_data_pca_pls = lol.embed(X, pca_pls)
+proj_data_pca_pls = spp.embed(X, pca_pls)
 
 proj_data_pca_pls = as.data.frame(proj_data_pca_pls)
 # 修改列名

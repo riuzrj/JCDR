@@ -6,13 +6,13 @@ library(parallel)
 library(datamicroarray)
 library(dplyr)
 
-file_source <- list.files('/Users/ruijuanzhong/spp/R')
+file_source <- list.files('/Users/ruijuanzhong/JCDR/R')
 for (i in 1:length(file_source)) {
-  file_source[i] <- paste('/Users/ruijuanzhong/spp/R/',file_source[i],sep ="")}
+  file_source[i] <- paste('/Users/ruijuanzhong/JCDR/R/',file_source[i],sep ="")}
 sapply(file_source,source)
-file_source <- list.files('/Users/ruijuanzhong/spp/docs/lolR')
+file_source <- list.files('/Users/ruijuanzhong/JCDR/docs/lolR')
 for (i in 1:length(file_source)) {
-  file_source[i] <- paste('/Users/ruijuanzhong/spp/docs/lolR/',file_source[i],sep ="")}
+  file_source[i] <- paste('/Users/ruijuanzhong/JCDR/docs/lolR/',file_source[i],sep ="")}
 sapply(file_source,source)
 
 no_cores = detectCores()
@@ -128,9 +128,9 @@ sets <- lol.xval.split(X, Y, k=k, rank.low=TRUE)
 
 algs <- list(lol.project.pca, lol.project.lrlda, spp, lol.project.pls,
              lol.project.lol, spp)
-names(algs) <- c("PCA", "rrLDA", 'Naive_pca-pls', 'PLS', 'LOL', 'pca+pls')
+names(algs) <- c("PCA", "rrLDA", 'MCDR', 'PLS', 'LOL', 'JCDR')
 alg.opts=list(list(), list(), list(method='xi'), list(), list(), list(method='pca+pls'))
-names(alg.opts) <- c("PCA", "rrLDA", 'Naive_pca-pls', 'PLS', 'LOL', 'pca+pls')
+names(alg.opts) <- c("PCA", "rrLDA", 'MCDR', 'PLS', 'LOL', 'JCDR')
 
 # algs <- list(lol.project.lol)
 # names(algs) <- c("pca+pls")

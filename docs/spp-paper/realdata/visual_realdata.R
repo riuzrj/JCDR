@@ -5,7 +5,7 @@ data <- data.frame(
   Dataset = c("yeoh", "yeoh", "yeoh", "yeoh","yeoh",
               "burczynski", "burczynski", "burczynski", "burczynski", "burczynski",
               "nakayama", "nakayama", "nakayama", "nakayama", "nakayama"),
-  Method = rep(c("PCA", "LRLDA", "PLS", 'LOL', 'PCA+PLS'),3),
+  Method = rep(c("PCA", "LRLDA", "PLS", 'LOL', 'JCDR'),3),
   Error = c(0.012, 0.024, 0.00801, 0.00801, 0.004,
             0.0397435897435897, 0.126923076923077, 0.0397435897435897,0.0705128205128205, 0.03205128,
             0.292727272727273, 0.333636363636364, 0.284545454545455,0.294545454545455, 0.2381818)

@@ -12,13 +12,13 @@ Y = as.factor(sun$y)
 K = 4
 
 
-file_source <- list.files('/Users/ruijuanzhong/spp/R')
+file_source <- list.files('/Users/ruijuanzhong/JCDR/R')
 for (i in 1:length(file_source)) {
-  file_source[i] <- paste('/Users/ruijuanzhong/spp/R/',file_source[i],sep ="")}
+  file_source[i] <- paste('/Users/ruijuanzhong/JCDR/R/',file_source[i],sep ="")}
 sapply(file_source,source)
-file_source <- list.files('/Users/ruijuanzhong/spp/docs/lolR')
+file_source <- list.files('/Users/ruijuanzhong/JCDR/docs/lolR')
 for (i in 1:length(file_source)) {
-  file_source[i] <- paste('/Users/ruijuanzhong/spp/docs/lolR/',file_source[i],sep ="")}
+  file_source[i] <- paste('/Users/ruijuanzhong/JCDR/docs/lolR/',file_source[i],sep ="")}
 sapply(file_source,source)
 
 #no_cores = detectCores()
@@ -39,9 +39,9 @@ n <- dim(X)[1]; d <- dim(X)[2]
 
 #pca+pls
 algs <- list(spp)
-names(algs) <- c('pca+pls')
+names(algs) <- c('JCDR')
 algs.opts=list(list(method='pca+pls'))
-names(algs.opts) <- c('pca+pls')
+names(algs.opts) <- c('JCDR')
 
 len.set <- sapply(sets, function(set) length(set$train))
 max.r <- min(c(d - 1, min(len.set) - 1, 70))
@@ -116,7 +116,7 @@ cv = lapply(1:length(sets), function(i) {
       # project the data with the projection just learned
       # compute the trained classifier
       trained_classifier <- do.call(classifier,
-                                    c(list(lol.embed(X[set$train,,drop=FALSE], A.pq),
+                                    c(list(spp.embed(X[set$train,,drop=FALSE], A.pq),
                                            as.factor(Y[set$train,drop=FALSE])),classifier.opts))
       #print('trained.classifier')
       # and compute the held-out error for particular fold
@@ -197,7 +197,7 @@ iteration_function <- function(j) {
 
   algs <- list(lol.project.pca, lol.project.lrlda, lol.project.pls,
                lol.project.lol, spp, spp)
-  algs.name <- c("PCA", "rrLDA", "PLS", "LOL", 'pca+pls', 'Naive_pca+pls')
+  algs.name <- c("PCA", "rrLDA", "PLS", "LOL", 'JCDR', 'MCDR')
   names(algs) <-algs.name
   algs.opts=list(list(), list(), list(),
                  list(), list(method='pca+pls'), list(method='xi'))

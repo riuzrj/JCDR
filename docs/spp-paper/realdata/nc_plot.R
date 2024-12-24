@@ -1,3 +1,4 @@
+
 results <- read.csv("/Users/ruijuanzhong/Project/gaus_noise_sun_inK.csv")
 library(tidyverse)
 head(results)
@@ -13,7 +14,7 @@ filterd_results <- results %>%
   summarize(lhat = mean(lhat)) %>%
   #filter(!(alg %in% c('pca+pls') & !(r %in% rs))) %>%
   #把大于 30 的 r 值过滤掉
-  filter(r <= 50) 
+  filter(r <= 50)
 #   mutate(smoothed = list(spline(rs, lhat, xout = desired_r, method = 'fmm', ties = mean))) %>%
 # # 使用 unnest 获得平滑后的数据
 #   unnest(c(smoothed))
@@ -21,7 +22,7 @@ filterd_results <- results %>%
 #用 spline 函数进行平滑处理
 # smoothed_results <- filterd_results %>%
 #   group_by(sim, alg) %>%
-#   summarize(x = list(desired_r), y = list(spline(r, lhat, xout = desired_r, 
+#   summarize(x = list(desired_r), y = list(spline(r, lhat, xout = desired_r,
 #                                                  method = 'fmm', ties = mean)$y)) %>%
 #   unnest(c(x, y))
 
@@ -61,7 +62,7 @@ dt_plot <- smoothed_results %>%
 #   group_by(sim, alg) %>%
 #   summarize(x = list(desired_r), y = list(spline(r, lhat, xout = desired_r, method = 'fmm', ties = mean)$y)) %>%
 #   unnest(c(x, y))
-# 
+#
 # dt_plot <- smoothed_results %>%
 #   group_by(sim, alg) %>%
 #   mutate(best.lhat = min(y),
@@ -75,9 +76,9 @@ dt_plot <- smoothed_results %>%
 # Continue with your plotting code
 # ...
 
-# dt_plot <- results %>% 
-#   group_by(sim,alg,r) %>% 
-#   summarise(lhat=mean(lhat)) %>% 
+# dt_plot <- results %>%
+#   group_by(sim,alg,r) %>%
+#   summarise(lhat=mean(lhat)) %>%
 #   #filter(!(alg %in% c('pca+pls') & !(r %in% rs))) %>%
 #   mutate(best.lhat=min(lhat),
 #          best.r=list(r[lhat == best.lhat]),
@@ -93,7 +94,7 @@ dt_plot <- smoothed_results %>%
 
 
 
-# mutate(alg=factor(recode_factor(alg, "QOL"="QOQ", "LRLDA"="rrLDA"), 
+# mutate(alg=factor(recode_factor(alg, "QOL"="QOQ", "LRLDA"="rrLDA"),
 #                   levels=algs.name,
 #                   ordered=TRUE)) %>%
 #filter(!((alg %in% c("RLOL")) & (sim == "Cross"))) %>%
@@ -119,7 +120,7 @@ line_lib <- c("PCA"="solid", "LOL"="solid", "PLS"="solid",
 
 dt.star <- dt_plot %>% filter(r == r.star)
 dt_plot %>%
-  # slice(nan.idx) %>% 
+  # slice(nan.idx) %>%
   ggplot(aes(x=r, y=lhat, color=alg)) +
   geom_line(aes(linetype=alg), linewidth=0.7) +
   scale_linetype_manual(values=line_lib, name="Algorithm") +
@@ -129,11 +130,11 @@ dt_plot %>%
   facet_wrap(.~sim,scales = 'free',nrow = 2) +
   xlab("r") +
   ylab("error") +
-  guides(color=guide_legend(ncol=1), linetype=guide_legend(ncol=1)) 
+  guides(color=guide_legend(ncol=1), linetype=guide_legend(ncol=1))
 # labs(
 #   title = paste('Classifier:',classifier.name,', n=',n,', d=',dim(X[2]),', rep=')  ) +
 # theme(text=element_text(size=18))
 # strip.text.x=element_blank(),
-# strip.background=element_blank()) 
+# strip.background=element_blank())
 
 

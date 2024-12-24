@@ -140,27 +140,26 @@ length(Y)
 k = 10
 sets <- lol.xval.split(X, Y, k=k, rank.low=TRUE)
 
+library(adabag)
+classifier.name <- "adaboost"
+classifier.alg <- adabag::boosting
+classifier.return <- 'class'
+
+classifier.name <- "knn"
+classifier.alg <- class::knn
+#classifier.opts <- list(method = "knn")
+classifier.return = NaN
+
+classifier.name <- "svm"
+classifier.alg <- e1071::svm
+classifier.return = NaN
 
 algs <- list(lol.project.pca, lol.project.lrlda, spp, lol.project.pls,
              lol.project.lol, spp)
-names(algs) <- c("PCA", "rrLDA", 'Naive_pca-pls', 'PLS', 'LOL', 'pca+pls')
+names(algs) <- c("PCA", "rrLDA", 'MCDR', 'PLS', 'LOL', 'JCDR')
 alg.opts=list(list(), list(), list(method='xi'), list(), list(), list(method='pca+pls'))
-names(alg.opts) <- c("PCA", "rrLDA", 'Naive_pca-pls', 'PLS', 'LOL', 'pca+pls')
+names(alg.opts) <- c("PCA", "rrLDA", 'MCDR', 'PLS', 'LOL', 'JCDR')
 
-# algs <- list(lol.project.lol)
-# names(algs) <- c("pca+pls")
-# alg.opts=list(list(method='pca+pls'))
-# names(alg.opts) <- c("pca+pls")
-
-# algs <- list(lol.project.lol)
-# names(algs) <- c("xi")
-# alg.opts=list(list(method= 'mvi'))
-# names(alg.opts) <- c("xi")
-#
-# algs <- list(lol.project.pls, lol.project.lol)
-# names(algs) <- c("PLS", "LOL")
-# alg.opts=list(list(), list())
-# names(alg.opts) <- c("PLS", "LOL")
 
 experiments <- list()
 counter <- 1
@@ -177,16 +176,14 @@ if (n != x.n) {
   stop(sprintf("Your X has %d examples, but you only provide %d labels.", x.n, n))
 }
 
-# opath <- '/Users/ruijuanzhong/Project/lol.pro/data/singh_data/'
-# dir.create(opath)
+
 
 log.seq <- function(from=0, to=15, length=rlen) {
   round(exp(seq(from=log(from), to=log(to), length.out=length)))
 }
 
 rs <- unique(log.seq(from=1, to=max.r, length=rlen))
-#print(length(rs))
-#print(rs)
+
 results <- data.frame(exp=c(), alg=c(), xv=c(), n=c(), ntrain=c(), d=c(), K=c(), fold=c(), r=c(), lhat=c())
 for (i in 1:length(algs)) {
   classifier.ret <- classifier.return
@@ -210,19 +207,9 @@ for (i in 1:length(algs)) {
   }, error=function(e) {print(e); return(NULL)})
 }
 
-# classifier <- "RandomGuess"
-# model <- do.call(classifier.algs[[classifier]], list(X[sets[[1]]$train, ], factor(Y[sets[[1]]$train], levels=unique(Y[sets[[1]]$train]))))
-# results <- rbind(results, data.frame(exp=taskname, alg=algs, xv=k, n=n, ntrain=length(sets[[1]]$train), d=d, K=length(unique(Y)),
-#                                      fold=fold$fold, r=NaN, lhat=1 - max(model$priors), repo=dat$repo))
-#
-# results <- results[complete.cases(results$lhat),]
-#
-# saveRDS(results, file=paste(opath, taskname, '_', fold$fold, '.rds', sep=""))
-#return(results)
 
-#time.after=Sys.time()
 
 resultso <- do.call(rbind, results)
 
 results <- t(resultso)
-write.csv(results, file=paste('/Users/ruijuanzhong/Project/', 'sun_aug.csv', sep=""), row.names=FALSE)
+write.csv(results, file=paste('/Users/ruijuanzhong/JCDR/docs/spp-paper/realdata/', 'TCGA.csv', sep=""), row.names=FALSE)
