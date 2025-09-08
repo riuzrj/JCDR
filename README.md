@@ -16,5 +16,20 @@ This approach blends discriminative structural information (via PCA, PLS, and fi
 - **PLS** projects data to maximize covariance with class labels, making it more predictive compared to variance-only methods like PCA.  
 - **Cross-validation** provides principled model selection and tuning, especially for determining optimal dimensionality in supervised learning.
 
+## System Requirements
+
+- **R version**: 4.0.0 or higher (tested on R 4.2+)  
+- **Operating systems**: Linux (e.g., Ubuntu 16.04+), macOS, and Windows (development and testing performed on Linux and macOS)  
+- **Hardware**: A standard computer with at least 2 GB of RAM is sufficient for small datasets. For larger high-dimensional datasets, we recommend 16+ GB RAM and a multi-core CPU (≥4 cores).  
+- **Dependencies**:  
+  - [MASS](https://cran.r-project.org/package=MASS) (for LDA classifier)   
+  - [lolR](https://cran.r-project.org/package=lolR) (for cross-validation utilities)  
+  - [dplyr](https://cran.r-project.org/package=dplyr)  
+  - [adabag](https://cran.r-project.org/package=adabag) (optional, AdaBoost)  
+  - [class](https://cran.r-project.org/package=class) (for kNN)  
+  - [randomForest](https://cran.r-project.org/package=randomForest) (optional, random forest)  
+
+All required dependencies are installed automatically when installing **JCDR** with `devtools::install_github()`.  
+
 
 
