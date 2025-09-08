@@ -98,3 +98,25 @@ dim(model$A)   # projection matrix (60 x 10)
 head(model$Xr) # projected data (n x 10)
 '''
 
+### 2: Cross-validation with 'spp.xval.optimal_dimselect()'
+
+'''r
+library(MASS)
+library(dplyr)
+library(JCDR)
+library(mlbench)
+data(Sonar)
+
+X <- as.matrix(Sonar[, 1:60])   # 60 features
+Y <- Sonar[, 61]                # labels (M or R)
+
+rs <- c(3, 4, 5, 10, 15, 20, 25, 30)
+classifier.name <- c('lda')
+cval <- spp.xval.optimal_dimselect(X, Y, rs, 
+                    spp, alg.opts=list(method='pca+pls'),
+                    alg.embedding="A", classifier.opts=list(),k=5)
+'''
+
+## Issues
+
+If you encounter any bugs or have feature requests, please [open an issue](https://github.com/riuzrj/JCDR/issues) on GitHub.
