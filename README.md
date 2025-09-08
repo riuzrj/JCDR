@@ -96,11 +96,11 @@ model <- spp(X, Y, r = 10, method = "pca+pls")
 
 dim(model$A)   # projection matrix (60 x 10)
 head(model$Xr) # projected data (n x 10)
-'''
+```
 
-### 2: Cross-validation with 'spp.xval.optimal_dimselect()'
+### Example 2: Cross-validation with `spp.xval.optimal_dimselect()`
 
-'''r
+```r
 library(MASS)
 library(dplyr)
 library(JCDR)
@@ -115,7 +115,7 @@ classifier.name <- c('lda')
 cval <- spp.xval.optimal_dimselect(X, Y, rs, 
                     spp, alg.opts=list(method='pca+pls'),
                     alg.embedding="A", classifier.opts=list(),k=5)
-'''
+```
 
 ## Issues
 
