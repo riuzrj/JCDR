@@ -16,6 +16,8 @@ This approach blends discriminative structural information (via PCA, PLS, and fi
 - **PLS** projects data to maximize covariance with class labels, making it more predictive compared to variance-only methods like PCA.  
 - **Cross-validation** provides principled model selection and tuning, especially for determining optimal dimensionality in supervised learning.
 
+---
+
 ## System Requirements
 
 - **R version**: 4.0.0 or higher (tested on R 4.2+)  
@@ -31,5 +33,68 @@ This approach blends discriminative structural information (via PCA, PLS, and fi
 
 All required dependencies are installed automatically when installing **JCDR** with `devtools::install_github()`.  
 
+---
 
+## Installation
+
+You can install the development version of **JCDR** from GitHub using the [`devtools`](https://cran.r-project.org/package=devtools) package:
+
+```r
+# Install devtools if not already installed
+install.packages("devtools")
+
+# Install JCDR from GitHub
+devtools::install_github("riuzrj/JCDR")
+```
+
+---
+
+## Usage
+
+This GitHub repository contains an R package called **JCDR**, which provides the source code to perform **joint composite dimensionality reduction**. After installing the JCDR package, you can directly call the core function `spp()` to compute the projection matrix and embed high-dimensional data. For model selection, the function `spp.xval.optimal_dimselect()` can be used to perform cross-validation and choose the optimal combination and embedding dimension.
+
+The return of `spp()` includes:
+- `A`: projection matrix \([d, r]\) from original features to reduced dimensions.
+- `Xr`: projected data \([n, r]\).
+- `cr`: projected class centroids.
+- `priors`: class prior probabilities.
+- `ylabs`: unique class labels.
+
+Here is a description of some of the important parameters:
+
+- `X`: data matrix \([n, d]\), with `n` samples and `d` features.  
+- `Y`: label vector \([n]\), with `K` unique class labels.  
+- `r`: target embedding dimension. Must satisfy `r < d` and `r ≥ K`.  
+- `method`: projection method. Options include `"mvi"`, `"xi"`, `"double.proj"`, and `"pca+pls"` (default).  
+- `first.moment`: whether to add class-mean separation directions (`"delta"` or `FALSE`).  
+- `robust.first`, `robust.second`: options for robust estimation.  
+
+For cross-validation:
+
+- `spp.xval.optimal_dimselect(X, Y, rs, alg, ...)`  
+  - `rs`: candidate embedding dimensions to evaluate.  
+  - `alg`: embedding algorithm.  
+  - `k`: number of folds for CV (default `'loo'`).  
+  - `classifier`: classifier for evaluation (default: `MASS::lda`).  
+  - Returns: fold-wise errors, mean error per dimension, the optimal dimension, and the final model.  
+
+---
+## Examples
+
+### Example 1: Projection with `spp()`
+
+```r
+library(JCDR)
+library(mlbench)   # provides Sonar dataset
+
+data(Sonar)
+X <- as.matrix(Sonar[, 1:60])   # 60 features
+Y <- Sonar[, 61]                # labels (M or R)
+
+# Run projection into 10 dimensions
+model <- spp(X, Y, r = 10, method = "pca+pls")
+
+dim(model$A)   # projection matrix (60 x 10)
+head(model$Xr) # projected data (n x 10)
+'''
 
